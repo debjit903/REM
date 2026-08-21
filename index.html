@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stock Market Data Viewer</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    body {
+      background-color: #f0f7ff;
+      color: #1e293b;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      background-color: #ffffff;
+      width: 100%;
+      max-width: 580px;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(2, 132, 199, 0.08);
+      border: 1px solid #e0f2fe;
+    }
+
+    h2 {
+      color: #0284c7;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+      position: relative;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 600;
+      font-size: 14px;
+      color: #0369a1;
+    }
+
+    input {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1px solid #bae6fd;
+      border-radius: 6px;
+      font-size: 15px;
+      background-color: #f8fafc;
+      outline: none;
+      transition: all 0.2s ease;
+    }
+
+    input:focus {
+      border-color: #0284c7;
+      background-color: #ffffff;
+      box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
+    }
+
+    /* Autocomplete dropdown styles */
+    .autocomplete-items {
+      position: absolute;
+      border: 1px solid #bae6fd;
+      border-top: none;
+      z-index: 99;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background-color: #ffffff;
+      border-radius: 0 0 6px 6px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .autocomplete-item {
+      padding: 10px 14px;
+      cursor: pointer;
+      font-size: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #f0f9ff;
+    }
+
+    .autocomplete-item:hover {
+      background-color: #e0f2fe;
+    }
+
+    .autocomplete-item .symbol {
+      font-weight: 700;
+      color: #0284c7;
+    }
+
+    .autocomplete-item .name {
+      color: #64748b;
+      font-size: 13px;
+      text-align: right;
+      margin-left: 10px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    button {
+      width: 100%;
+      padding: 12px;
+      background-color: #0284c7;
+      color: #ffffff;
+      border: none;
+      border-radius: 6px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+      margin-top: 10px;
+    }
+
+    button:hover {
+      background-color: #0369a1;
+    }
+
+    .result-box {
+      margin-top: 25px;
+      display: none;
+    }
+
+    .section-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: #0284c7;
+      border-bottom: 2px solid #e0f2fe;
+      padding-bottom: 6px;
+      margin-top: 18px;
+      margin-bottom: 10px;
+    }
+
+    .data-list {
+      list-style: none;
+    }
+
+    .data-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 12px;
+      background-color: #f0f9ff;
+      margin-bottom: 6px;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+
+    .data-item span.key {
+      font-weight: 600;
+      color: #0369a1;
+    }
+
+    .error {
+      color: #dc2626;
+      background-color: #fef2f2;
+      padding: 10px 14px;
+      border-radius: 6px;
+      margin-top: 15px;
+      font-size: 14px;
+      display: none;
+      border: 1px solid #fecaca;
+    }
+
+    .loading {
+      text-align: center;
+      color: #0284c7;
+      margin-top: 15px;
+      font-weight: 500;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h2>Stock Data Finder</h2>
+
+    <div class="form-group">
+      <label for="symbol">Search Company or Symbol</label>
+      <input type="text" id="symbol" placeholder="Type name or symbol e.g., Apple, IBM..." autocomplete="off">
+      <div id="autocomplete-list" class="autocomplete-items"></div>
+    </div>
+
+    <div class="form-group">
+      <label for="date">Select Date</label>
+      <input type="date" id="date">
+    </div>
+
+    <button onclick="fetchStockData()">Search Data</button>
+
+    <div id="loading" class="loading">Fetching data from Alpha Vantage...</div>
+    <div id="error" class="error"></div>
+
+    <div id="results" class="result-box">
+      <div class="section-title">Meta Data</div>
+      <ul id="meta-data" class="data-list"></ul>
+
+      <div class="section-title" id="daily-title">Daily Stock Metrics</div>
+      <ul id="daily-data" class="data-list"></ul>
+    </div>
+  </div>
+
+  <script>
+    const apiKey = 'VJ7IT92QDWREY739';
+    const symbolInput = document.getElementById('symbol');
+    const autocompleteList = document.getElementById('autocomplete-list');
+    const dateInput = document.getElementById('date');
+
+    // Set default date
+    dateInput.value = '2026-08-07';
+
+    let debounceTimer;
+
+    // Listen for input to perform autocomplete symbol search
+    symbolInput.addEventListener('input', function() {
+      const query = this.value.trim();
+      clearTimeout(debounceTimer);
+      autocompleteList.innerHTML = '';
+
+      if (query.length < 2) {
+        return;
+      }
+
+      debounceTimer = setTimeout(() => {
+        searchSymbols(query);
+      }, 300);
+    });
+
+    async function searchSymbols(keywords) {
+      try {
+        const url = `https://www.alphavantage.co/query?function=SYMBOL_SEARCH&keywords=${encodeURIComponent(keywords)}&apikey=${apiKey}`;
+        const response = await fetch(url);
+        const data = await response.json();
+
+        autocompleteList.innerHTML = '';
+
+        if (data.bestMatches && data.bestMatches.length > 0) {
+          data.bestMatches.forEach(item => {
+            const symbol = item['1. symbol'];
+            const name = item['2. name'];
+
+            const div = document.createElement('div');
+            div.className = 'autocomplete-item';
+            div.innerHTML = `<span class="symbol">${symbol}</span><span class="name">${name}</span>`;
+
+            div.addEventListener('click', function() {
+              symbolInput.value = symbol;
+              autocompleteList.innerHTML = '';
+            });
+
+            autocompleteList.appendChild(div);
+          });
+        }
+      } catch (err) {
+        console.error('Error fetching search results:', err);
+      }
+    }
+
+    // Close autocomplete menu when clicking outside
+    document.addEventListener('click', function(e) {
+      if (e.target !== symbolInput) {
+        autocompleteList.innerHTML = '';
+      }
+    });
+
+    async function fetchStockData() {
+      const symbol = symbolInput.value.trim().toUpperCase();
+      const selectedDate = dateInput.value;
+
+      const loadingDiv = document.getElementById('loading');
+      const errorDiv = document.getElementById('error');
+      const resultsDiv = document.getElementById('results');
+      const metaList = document.getElementById('meta-data');
+      const dailyList = document.getElementById('daily-data');
+      const dailyTitle = document.getElementById('daily-title');
+
+      errorDiv.style.display = 'none';
+      resultsDiv.style.display = 'none';
+      metaList.innerHTML = '';
+      dailyList.innerHTML = '';
+
+      if (!symbol) {
+        errorDiv.textContent = 'Please enter a company stock symbol.';
+        errorDiv.style.display = 'block';
+        return;
+      }
+
+      if (!selectedDate) {
+        errorDiv.textContent = 'Please select a date.';
+        errorDiv.style.display = 'block';
+        return;
+      }
+
+      loadingDiv.style.display = 'block';
+
+      try {
+        const url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&apikey=${apiKey}`;
+        const response = await fetch(url);
+        const data = await response.json();
+
+        loadingDiv.style.display = 'none';
+
+        if (data['Error Message']) {
+          errorDiv.textContent = 'Invalid stock symbol or endpoint request failed.';
+          errorDiv.style.display = 'block';
+          return;
+        }
+
+        if (data['Information'] || data['Note']) {
+          errorDiv.textContent = data['Information'] || data['Note'];
+          errorDiv.style.display = 'block';
+          return;
+        }
+
+        // Render Meta Data
+        const metaData = data['Meta Data'];
+        if (metaData) {
+          for (const [key, value] of Object.entries(metaData)) {
+            const li = document.createElement('li');
+            li.className = 'data-item';
+            li.innerHTML = `<span class="key">${key}</span><span>${value}</span>`;
+            metaList.appendChild(li);
+          }
+        }
+
+        // Render Daily Data
+        const timeSeries = data['Time Series (Daily)'];
+        dailyTitle.textContent = `Daily Metrics (${selectedDate})`;
+
+        if (timeSeries && timeSeries[selectedDate]) {
+          const dayData = timeSeries[selectedDate];
+          for (const [key, value] of Object.entries(dayData)) {
+            const li = document.createElement('li');
+            li.className = 'data-item';
+            li.innerHTML = `<span class="key">${key}</span><span>${value}</span>`;
+            dailyList.appendChild(li);
+          }
+        } else {
+          const li = document.createElement('li');
+          li.className = 'data-item';
+          li.style.justifyContent = 'center';
+          li.style.color = '#64748b';
+          li.textContent = 'No market data available for this date (market may have been closed).';
+          dailyList.appendChild(li);
+        }
+
+        resultsDiv.style.display = 'block';
+
+      } catch (err) {
+        loadingDiv.style.display = 'none';
+        errorDiv.textContent = 'Failed to fetch data. Please verify network connection or API limit.';
+        errorDiv.style.display = 'block';
+      }
+    }
+  </script>
+</body>
+</html>
